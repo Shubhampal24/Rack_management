@@ -8,6 +8,7 @@ const MaterialSchema = new mongoose.Schema({
   category:     { type: String, default: '' },
   unit:         { type: String, default: 'PCS' },
   reorderLevel: { type: Number, default: 10, min: 0 },
+  isDeleted:    { type: Boolean, default: false },
   createdAt:    { type: Date, default: Date.now },
   updatedAt:    { type: Date, default: Date.now },
 })

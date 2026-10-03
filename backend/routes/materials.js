@@ -10,7 +10,7 @@ const router = Router()
  */
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const materials = await Material.find().sort({ id: 1 }).lean()
+    const materials = await Material.find({ isDeleted: { $ne: true } }).sort({ id: 1 }).lean()
     res.json(materials)
   } catch (err) { next(err) }
 })
@@ -29,6 +29,16 @@ router.post('/', requireAuth, async (req, res, next) => {
 
     const existing = await Material.findOne({ id: id.toUpperCase() })
     if (existing) {
+      if (existing.isDeleted) {
+        existing.isDeleted = false
+        existing.name = name.toUpperCase()
+        existing.description = description || ''
+        existing.category = category || ''
+        existing.unit = unit || 'PCS'
+        existing.reorderLevel = Number(reorderLevel) || 0
+        await existing.save()
+        return res.status(201).json(existing)
+      }
       return res.status(409).json({ error: `Material ID "${id.toUpperCase()}" already exists.` })
     }
 
@@ -55,7 +65,7 @@ router.put('/:id', requireAuth, async (req, res, next) => {
     const matId = req.params.id.toUpperCase()
     const { name, description, category, unit, reorderLevel } = req.body
 
-    const material = await Material.findOne({ id: matId })
+    const material = await Material.findOne({ id: matId, isDeleted: { $ne: true } })
     if (!material) return res.status(404).json({ error: `Material ${matId} not found.` })
 
     if (name !== undefined) material.name = name.toUpperCase()
@@ -79,19 +89,23 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
 
     // Dependency check 1: Is it assigned to any location?
     const Location = (await import('../models/Location.js')).default
-    const locInUse = await Location.findOne({ materialId: matId })
+    const locInUse = await Location.findOne({ materialId: matId, isDeleted: { $ne: true } })
     if (locInUse) {
       return res.status(400).json({ error: `Cannot delete: Material is currently assigned to location ${locInUse.locationId}.` })
     }
 
     // Dependency check 2: Does it have movement history?
     const Movement = (await import('../models/Movement.js')).default
-    const movInUse = await Movement.findOne({ materialId: matId })
+    const movInUse = await Movement.findOne({ materialId: matId, isDeleted: { $ne: true } })
     if (movInUse) {
       return res.status(400).json({ error: `Cannot delete: Material has existing transaction history.` })
     }
 
-    const deleted = await Material.findOneAndDelete({ id: matId })
+    const deleted = await Material.findOneAndUpdate(
+      { id: matId, isDeleted: { $ne: true } }, 
+      { isDeleted: true }, 
+      { new: true }
+    )
     if (!deleted) return res.status(404).json({ error: `Material ${matId} not found.` })
     res.json({ message: `Material ${matId} deleted.` })
   } catch (err) { next(err) }

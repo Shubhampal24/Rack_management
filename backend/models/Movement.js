@@ -12,6 +12,7 @@ const MovementSchema = new mongoose.Schema({
   reference:   { type: String, default: '' },
   user:        { type: String, default: 'Warehouse Manager' },
   notes:       { type: String, default: '' },
+  isDeleted:   { type: Boolean, default: false },
   createdAt:   { type: Date, default: Date.now },
 })
 

@@ -23,7 +23,7 @@ router.get('/', requireAuth, async (req, res, next) => {
       if (to) filter.date.$lte = to
     }
 
-    const movements = await Movement.find(filter).sort({ date: -1, createdAt: -1 }).lean()
+    const movements = await Movement.find({ ...filter, isDeleted: { $ne: true } }).sort({ date: -1, createdAt: -1 }).lean()
     res.json(movements)
   } catch (err) { next(err) }
 })
@@ -93,7 +93,7 @@ router.post('/transfer', requireAuth, async (req, res, next) => {
 
     // 1. Check stock at fromLocationId
     const [stockRes] = await Movement.aggregate([
-      { $match: { locationId: fromLocationId, materialId: cleanId } },
+      { $match: { locationId: fromLocationId, materialId: cleanId, isDeleted: { $ne: true } } },
       { $group: {
           _id: null,
           totalIn: { $sum: { $cond: [{ $eq: ['$type', 'IN'] }, '$quantity', 0] } },
@@ -107,7 +107,7 @@ router.post('/transfer', requireAuth, async (req, res, next) => {
     }
 
     // 2. Check destination location
-    const toLoc = await Location.findOne({ locationId: toLocationId })
+    const toLoc = await Location.findOne({ locationId: toLocationId, isDeleted: { $ne: true } })
     if (!toLoc) {
       return res.status(404).json({ error: `Destination location ${toLocationId} not found.` })
     }
@@ -152,8 +152,8 @@ router.post('/swap', requireAuth, async (req, res, next) => {
     const { locationA, locationB, user, date } = req.body
     if (!locationA || !locationB) return res.status(400).json({ error: 'locationA and locationB are required.' })
 
-    const locA = await Location.findOne({ locationId: locationA })
-    const locB = await Location.findOne({ locationId: locationB })
+    const locA = await Location.findOne({ locationId: locationA, isDeleted: { $ne: true } })
+    const locB = await Location.findOne({ locationId: locationB, isDeleted: { $ne: true } })
 
     if (!locA || !locB) return res.status(404).json({ error: 'One or both locations not found.' })
     if (!locA.materialId && !locB.materialId) return res.status(400).json({ error: 'At least one location must be assigned to a material to swap.' })
@@ -171,7 +171,7 @@ router.post('/swap', requireAuth, async (req, res, next) => {
     // We update all movements for matA in locationA to point to locationB
     if (matA) {
       await Movement.updateMany(
-        { materialId: matA, locationId: locationA },
+        { materialId: matA, locationId: locationA, isDeleted: { $ne: true } },
         { $set: { locationId: locationB } }
       )
     }
@@ -179,7 +179,7 @@ router.post('/swap', requireAuth, async (req, res, next) => {
     // We update all movements for matB in locationB to point to locationA
     if (matB) {
       await Movement.updateMany(
-        { materialId: matB, locationId: locationB },
+        { materialId: matB, locationId: locationB, isDeleted: { $ne: true } },
         { $set: { locationId: locationA } }
       )
     }
@@ -193,7 +193,11 @@ router.post('/swap', requireAuth, async (req, res, next) => {
  */
 router.delete('/:id', requireAuth, async (req, res, next) => {
   try {
-    const deleted = await Movement.findOneAndDelete({ id: req.params.id })
+    const deleted = await Movement.findOneAndUpdate(
+      { id: req.params.id, isDeleted: { $ne: true } },
+      { isDeleted: true },
+      { new: true }
+    )
     if (!deleted) return res.status(404).json({ error: `Movement ${req.params.id} not found.` })
     res.json({ message: `Movement ${req.params.id} deleted.` })
   } catch (err) { next(err) }
@@ -206,6 +210,7 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
 router.get('/stats', requireAuth, async (req, res, next) => {
   try {
     const [result] = await Movement.aggregate([
+      { $match: { isDeleted: { $ne: true } } },
       {
         $group: {
           _id: null,

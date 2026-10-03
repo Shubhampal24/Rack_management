@@ -11,6 +11,7 @@ const RackSchema = new mongoose.Schema({
   side:        { type: String, default: 'Single-sided' },
   status:      { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   notes:       { type: String, default: '' },
+  isDeleted:   { type: Boolean, default: false },
   createdAt:   { type: Date, default: Date.now },
   updatedAt:   { type: Date, default: Date.now },
 })

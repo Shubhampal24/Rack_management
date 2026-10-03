@@ -2,6 +2,7 @@
 import { Router } from 'express'
 import Rack from '../models/Rack.js'
 import Location from '../models/Location.js'
+import Movement from '../models/Movement.js'
 import { requireAuth } from '../middleware/auth.js'
 
 const router = Router()
@@ -34,7 +35,7 @@ function generateLocations(rackId, bayCount, levels, slots) {
  */
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const racks = await Rack.find().sort({ id: 1 }).lean()
+    const racks = await Rack.find({ isDeleted: { $ne: true } }).sort({ id: 1 }).lean()
     res.json(racks)
   } catch (err) { next(err) }
 })
@@ -59,27 +60,50 @@ router.post('/', requireAuth, async (req, res, next) => {
       ? slots.map(s => s.trim()).filter(Boolean)
       : (slots || 'A').split(',').map(s => s.trim()).filter(Boolean)
 
-    const rack = new Rack({
-      id: id.toUpperCase(),
-      type: type || 'Pallet Rack',
-      description: description || '',
-      bayCount: Number(bayCount) || 1,
-      levels: levelsArr,
-      slots: slotsArr,
-      side: side || 'Single-sided',
-      notes: notes || '',
-    })
+    const existing = await Rack.findOne({ id: id.toUpperCase() })
+    let rack
+    if (existing) {
+      if (existing.isDeleted) {
+        existing.isDeleted = false
+        existing.type = type || 'Pallet Rack'
+        existing.description = description || ''
+        existing.bayCount = Number(bayCount) || 1
+        existing.levels = levelsArr
+        existing.slots = slotsArr
+        existing.side = side || 'Single-sided'
+        existing.notes = notes || ''
+        rack = existing
+      } else {
+        return res.status(409).json({ error: `Rack ID "${id.toUpperCase()}" already exists.` })
+      }
+    } else {
+      rack = new Rack({
+        id: id.toUpperCase(),
+        type: type || 'Pallet Rack',
+        description: description || '',
+        bayCount: Number(bayCount) || 1,
+        levels: levelsArr,
+        slots: slotsArr,
+        side: side || 'Single-sided',
+        notes: notes || '',
+      })
+    }
 
     await rack.save()
 
     // Auto-generate locations
     const locDocs = generateLocations(rack.id, rack.bayCount, levelsArr, slotsArr)
     if (locDocs.length > 0) {
-      // insertMany with ordered:false skips duplicates without failing
       await Location.insertMany(
         locDocs.map(l => ({ ...l, materialId: '', batch: '', notes: '' })),
         { ordered: false }
       ).catch(() => {}) // ignore duplicate key errors (locations already exist)
+      
+      // Undelete any existing locations that fall within bounds (in case it was previously soft-deleted)
+      await Location.updateMany(
+        { rack: rack.id, isDeleted: true },
+        { isDeleted: false }
+      )
     }
 
     res.status(201).json(rack)
@@ -109,16 +133,53 @@ router.put('/:id', requireAuth, async (req, res, next) => {
 
     const newBayCount = bayCount !== undefined ? Number(bayCount) : rack.bayCount
 
-    // Validate bay count - cannot shrink below max occupied bay
+    // Find locations with active stock
+    const activeMovements = await Movement.aggregate([
+      { $match: { locationId: { $regex: `^${rackId}-` }, isDeleted: { $ne: true } } },
+      { $group: {
+          _id: "$locationId",
+          total: { $sum: { $cond: [{ $eq: ['$type', 'IN'] }, '$quantity', { $multiply: ['$quantity', -1] }] } }
+      }},
+      { $match: { total: { $gt: 0 } } }
+    ])
+    const locationsWithStock = activeMovements.map(m => m._id)
+
+    // Validate that we aren't removing bays, levels, or slots that are currently in use
     const occupiedLocations = await Location.find({
       rack: rackId,
-      materialId: { $ne: '' }
+      isDeleted: { $ne: true },
+      $or: [
+        { materialId: { $ne: '' } },
+        { locationId: { $in: locationsWithStock } }
+      ]
     })
+
+    // Check bays
     const maxOccupiedBay = occupiedLocations.reduce((m, l) => Math.max(m, l.bay), 0)
     if (newBayCount < maxOccupiedBay) {
       return res.status(400).json({
-        error: `Cannot reduce bays below ${maxOccupiedBay}. Bay ${maxOccupiedBay} has assigned materials.`
+        error: `Cannot reduce bays below ${maxOccupiedBay}. Bay ${maxOccupiedBay} is currently holding stock or assigned to a material.`
       })
+    }
+
+    // Check levels
+    const removedLevels = rack.levels.filter(lvl => !levelsArr.includes(lvl))
+    for (const lvl of removedLevels) {
+      if (occupiedLocations.some(loc => loc.level === lvl)) {
+        return res.status(400).json({
+          error: `Cannot remove level '${lvl}' because it is currently holding stock or assigned to a material. Please empty and unassign it first.`
+        })
+      }
+    }
+
+    // Check slots
+    const removedSlots = rack.slots.filter(s => !slotsArr.includes(s))
+    for (const slot of removedSlots) {
+      if (occupiedLocations.some(loc => loc.slot === slot)) {
+        return res.status(400).json({
+          error: `Cannot remove slot '${slot}' because it is currently holding stock or assigned to a material. Please empty and unassign it first.`
+        })
+      }
     }
 
     // Update rack
@@ -133,7 +194,7 @@ router.put('/:id', requireAuth, async (req, res, next) => {
     await rack.save()
 
     // Prune empty locations that fall outside new bounds
-    await Location.deleteMany({
+    await Location.updateMany({
       rack: rackId,
       materialId: '',  // only prune unassigned
       $or: [
@@ -141,7 +202,7 @@ router.put('/:id', requireAuth, async (req, res, next) => {
         { level: { $nin: levelsArr } },
         { slot: { $nin: slotsArr } },
       ]
-    })
+    }, { isDeleted: true })
 
     // Generate missing locations within new bounds
     const newLocs = generateLocations(rackId, newBayCount, levelsArr, slotsArr)
@@ -150,6 +211,12 @@ router.put('/:id', requireAuth, async (req, res, next) => {
         newLocs.map(l => ({ ...l, materialId: '', batch: '', notes: '' })),
         { ordered: false }
       ).catch(() => {})
+      
+      // Undelete any existing locations that fall within new bounds
+      await Location.updateMany(
+        { rack: rackId, bay: { $lte: newBayCount }, level: { $in: levelsArr }, slot: { $in: slotsArr }, isDeleted: true },
+        { isDeleted: false }
+      )
     }
 
     res.json(rack)
@@ -179,12 +246,27 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
 router.delete('/:id', requireAuth, async (req, res, next) => {
   try {
     const rackId = req.params.id.toUpperCase()
-    const assigned = await Location.findOne({ rack: rackId, materialId: { $ne: '' } })
-    if (assigned) {
-      return res.status(400).json({ error: 'Cannot delete rack with assigned materials. Unassign first.' })
+    const activeMovements = await Movement.aggregate([
+      { $match: { locationId: { $regex: `^${rackId}-` }, isDeleted: { $ne: true } } },
+      { $group: {
+          _id: "$locationId",
+          total: { $sum: { $cond: [{ $eq: ['$type', 'IN'] }, '$quantity', { $multiply: ['$quantity', -1] }] } }
+      }},
+      { $match: { total: { $gt: 0 } } }
+    ])
+
+    const assigned = await Location.findOne({ rack: rackId, materialId: { $ne: '' }, isDeleted: { $ne: true } })
+    
+    if (assigned || activeMovements.length > 0) {
+      return res.status(400).json({ error: 'Cannot delete rack with assigned materials or active stock. Empty it first.' })
     }
-    await Rack.deleteOne({ id: rackId })
-    await Location.deleteMany({ rack: rackId })
+    
+    // Soft delete the rack
+    await Rack.updateOne({ id: rackId }, { isDeleted: true })
+    
+    // Soft delete all locations in the rack
+    await Location.updateMany({ rack: rackId }, { isDeleted: true })
+    
     res.json({ message: `Rack ${rackId} and all its locations deleted.` })
   } catch (err) { next(err) }
 })
