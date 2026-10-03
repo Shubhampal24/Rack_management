@@ -110,40 +110,42 @@ export default function Inventory() {
             <Button size="sm" variant="outline" onClick={exportCSV} className="w-full sm:w-auto"><Download size={13}/> Export CSV</Button>
           </div>
           {/* Filters */}
-          <div className="flex flex-wrap gap-2 mt-2">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex flex-col lg:flex-row gap-2 mt-2">
+            <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search material, ID, location..." className="pl-9" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search material, ID, location..." className="pl-9 w-full" />
             </div>
-            <div className="w-40">
-              <Select value={catFilter} onValueChange={setCatFilter}>
-                <SelectTrigger><SelectValue placeholder="All Categories" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {uniqueCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-36">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="OK">OK</SelectItem>
-                  <SelectItem value="REORDER">REORDER</SelectItem>
-                  <SelectItem value="EMPTY">EMPTY</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-36">
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="materialId">Sort: ID</SelectItem>
-                  <SelectItem value="stock">Sort: Stock</SelectItem>
-                  <SelectItem value="status">Sort: Status</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="w-full lg:w-40">
+                <Select value={catFilter} onValueChange={setCatFilter}>
+                  <SelectTrigger><SelectValue placeholder="All Categories" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {uniqueCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full lg:w-36">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="OK">OK</SelectItem>
+                    <SelectItem value="REORDER">REORDER</SelectItem>
+                    <SelectItem value="EMPTY">EMPTY</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 sm:col-span-1 w-full lg:w-36">
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="materialId">Sort: ID</SelectItem>
+                    <SelectItem value="stock">Sort: Stock</SelectItem>
+                    <SelectItem value="status">Sort: Status</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardHeader>
