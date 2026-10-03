@@ -69,6 +69,7 @@ export function TopBar({ collapsed, setMobileOpen }) {
       </button>
 
       {/* Cloud Sync */}
+      {/* 
       <button 
         onClick={handleSync}
         disabled={isSyncing}
@@ -76,7 +77,8 @@ export function TopBar({ collapsed, setMobileOpen }) {
       >
         {isSyncing ? <Loader2 size={15} className="animate-spin" /> : <CloudUpload size={15} />}
         <span className="hidden sm:block">Sync Sheets</span>
-      </button>
+      </button> 
+      */}
 
       {/* Alert bell */}
       <button className="relative rounded-lg border border-border p-2 hover:bg-secondary/50 transition-colors shrink-0">
