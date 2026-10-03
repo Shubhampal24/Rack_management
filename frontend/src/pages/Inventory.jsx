@@ -49,9 +49,9 @@ export default function Inventory() {
        "Category",
        "Location ID",
        "Opening Stock",
+       "Current Stock",
        "Stock IN",
        "Stock OUT",
-       "Current Stock",
        "Unit",
        "Reorder Level",
        "Status"
@@ -62,9 +62,9 @@ export default function Inventory() {
       i.category || "",
       i.locationId || "",
       i.openingStock ?? 0,
+      Number(i.currentStock ?? 0).toFixed(2),
       i.stockIn ?? 0,
       i.stockOut ?? 0,
-      Number(i.currentStock ?? 0).toFixed(2),
       i.unit || "PCS",
       i.reorderLevel ?? 0,
       i.status || "OK"
@@ -155,9 +155,9 @@ export default function Inventory() {
                   <th className="text-left">Material</th>
                   <th className="text-left">Category</th>
                   <th className="text-left">Location</th>
+                  <th className="text-right">Current</th>
                   <th className="text-right">Stock IN</th>
                   <th className="text-right">Stock OUT</th>
-                  <th className="text-right">Current</th>
                   <th className="text-right">Reorder At</th>
                   <th className="text-center">Status</th>
                 </tr>
@@ -171,13 +171,27 @@ export default function Inventory() {
                     </td>
                     <td><CategoryBadge category={item.category} /></td>
                     <td><LocationBadge locationId={item.locationId} /></td>
-                    <td className="text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">{item.stockIn}</td>
-                    <td className="text-right font-mono text-sm text-red-600 dark:text-red-400">{item.stockOut}</td>
                     <td className="text-right">
-                      <span className="font-mono font-bold text-foreground">{Number(item.currentStock).toFixed(2)}</span>
-                      <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                      <span className="inline-block px-2.5 py-1 rounded-md bg-primary/15 text-primary font-bold border border-primary/30 shadow-sm">
+                        <span className="font-mono text-sm">{Number(item.currentStock).toFixed(2)}</span>
+                        <span className="text-[10px] uppercase ml-1 opacity-80">{item.unit}</span>
+                      </span>
                     </td>
-                    <td className="text-right font-mono text-sm text-muted-foreground">{item.reorderLevel} {item.unit}</td>
+                    <td className="text-right">
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono text-xs font-medium border border-emerald-500/20">
+                        {item.stockIn}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 font-mono text-xs font-medium border border-red-500/20">
+                        {item.stockOut}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-secondary/40 text-muted-foreground font-mono text-xs font-medium border border-border">
+                        {item.reorderLevel} <span className="text-[10px] uppercase ml-1 opacity-70">{item.unit}</span>
+                      </span>
+                    </td>
                     <td className="text-center"><StockBadge status={item.status} /></td>
                   </tr>
                 ))}
@@ -189,15 +203,21 @@ export default function Inventory() {
                 <tfoot>
                   <tr className="border-t-2 border-border bg-secondary/20">
                     <td colSpan={3} className="py-3 px-4 text-xs font-semibold text-muted-foreground">TOTALS ({filtered.length} items)</td>
-                    <td className="text-right py-3 px-4 font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                      {filtered.reduce((s, i) => s + (i.stockIn ?? 0), 0).toFixed(0)}
-                    </td>
-                    <td className="text-right py-3 px-4 font-mono text-sm font-bold text-red-600 dark:text-red-400">
-                      {filtered.reduce((s, i) => s + (i.stockOut ?? 0), 0).toFixed(0)}
+                    <td className="text-right py-3 px-4">
+                      <span className="inline-block px-2.5 py-1 rounded-md bg-primary/15 text-primary font-bold border border-primary/30 shadow-sm">
+                        <span className="font-mono text-sm">
+                          {filtered.reduce((s, i) => s + (i.currentStock ?? 0), 0).toFixed(2)}
+                        </span>
+                      </span>
                     </td>
                     <td className="text-right py-3 px-4">
-                      <span className="font-mono font-bold text-foreground">
-                        {filtered.reduce((s, i) => s + (i.currentStock ?? 0), 0).toFixed(2)}
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono text-sm font-bold border border-emerald-500/20">
+                        {filtered.reduce((s, i) => s + (i.stockIn ?? 0), 0).toFixed(0)}
+                      </span>
+                    </td>
+                    <td className="text-right py-3 px-4">
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 font-mono text-sm font-bold border border-red-500/20">
+                        {filtered.reduce((s, i) => s + (i.stockOut ?? 0), 0).toFixed(0)}
                       </span>
                     </td>
                     <td colSpan={2}></td>
