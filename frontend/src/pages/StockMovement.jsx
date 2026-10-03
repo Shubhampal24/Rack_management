@@ -150,11 +150,14 @@ export default function StockMovement() {
       // If no material selected yet, show any location currently holding stock
       return locations.filter(l => Number(l.quantity) > 0 || l.status === "Occupied")
     } else {
-      // For IN: show assigned location first, then available empty slots
+      // For IN: show assigned location first, then any location holding stock
       if (form.materialId) {
         const assigned = locations.filter(l => l.materialId === form.materialId)
-        const available = locations.filter(l => l.status === "Available" && l.materialId !== form.materialId)
-        return [...assigned, ...available]
+        const withStock = locations.filter(l => 
+          l.materialId !== form.materialId && 
+          inventory.some(i => i.materialId === form.materialId && i.locationId === l.locationId && i.currentStock > 0)
+        )
+        return [...assigned, ...withStock]
       }
       return locations
     }
@@ -596,50 +599,48 @@ export default function StockMovement() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Location ID <span className="text-destructive">*</span></Label>
-              <div className="relative">
-                <Combobox
-                  value={form.locationId}
-                  onChange={val => handleLocationChange(val.toUpperCase())}
-                  placeholder="e.g. R01-B01-GL1-A" 
-                  className="font-mono uppercase w-full" 
-                  options={locationOptions.map(l => {
-                    const invItem = inventory.find(i => i.locationId === l.locationId && (!form.materialId || i.materialId === form.materialId))
-                    const stock = invItem ? invItem.currentStock : Number(l.quantity || 0)
-                    return {
-                      value: l.locationId,
-                      sub: form.type === "OUT"
-                        ? `Stock: ${stock} ${l.unit || form.unit || "PCS"} · ${l.materialDesc || l.materialId || "Occupied"}`
-                        : l.materialId === form.materialId 
-                          ? `Primary Assigned for ${form.materialId}` 
-                          : l.status === "Available" 
-                            ? `Available (Empty slot · Rack ${l.rack})` 
-                            : `${l.status} · ${l.materialDesc || l.materialId || ""}`
-                    }
-                  })}
-                />
-                {form.locationId && (
-                  <button
-                    type="button"
-                    onClick={handleLocationCancel}
-                    className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors z-10 bg-background"
-                    title="Clear location and material"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
+            {form.materialId && (
+              <div className="space-y-1.5 animate-fade-in-up">
+                <Label>Location ID <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <Combobox
+                    value={form.locationId}
+                    onChange={val => handleLocationChange(val.toUpperCase())}
+                    placeholder="e.g. R01-B01-GL1-A" 
+                    className="font-mono uppercase w-full" 
+                    options={locationOptions.map(l => {
+                      const invItem = inventory.find(i => i.locationId === l.locationId && (!form.materialId || i.materialId === form.materialId))
+                      const stock = invItem ? invItem.currentStock : Number(l.quantity || 0)
+                      return {
+                        value: l.locationId,
+                        sub: form.type === "OUT"
+                          ? `Stock: ${stock} ${l.unit || form.unit || "PCS"} · ${l.materialDesc || l.materialId || "Occupied"}`
+                          : l.materialId === form.materialId 
+                            ? `Primary Assigned for ${form.materialId}` 
+                            : inventory.some(i => i.materialId === form.materialId && i.locationId === l.locationId && i.currentStock > 0)
+                              ? `Active Stock: ${stock} ${l.unit || form.unit || "PCS"}`
+                              : `${l.status} · ${l.materialDesc || l.materialId || ""}`
+                      }
+                    })}
+                  />
+                  {form.locationId && (
+                    <button
+                      type="button"
+                      onClick={handleLocationCancel}
+                      className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors z-10 bg-background"
+                      title="Clear location and material"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {form.type === "OUT"
+                    ? "Showing locations currently holding stock to issue from."
+                    : "Showing locations assigned to or currently holding stock of this material."}
+                </p>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                {form.type === "OUT"
-                  ? form.materialId
-                    ? "Auto-filled location with available stock. Select another if issuing from a different bay/slot."
-                    : "Showing locations currently holding stock to issue from."
-                  : form.materialId
-                    ? "Auto-filled primary assigned location. Select an empty slot if placing in another rack."
-                    : "Showing assigned location and available empty rack slots."}
-              </p>
-            </div>
+            )}
 
 
 
@@ -780,28 +781,30 @@ export default function StockMovement() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Source Location (From) <span className="text-destructive">*</span></Label>
-              <div className="relative">
-                <Combobox
-                  value={transferForm.locationId}
-                  onChange={val => handleTransferLocationChange(val.toUpperCase())}
-                  placeholder="Select source location..." 
-                  className="font-mono uppercase w-full border-blue-500/30" 
-                  options={locations.filter(l => {
-                    if (isSwapMode) return l.materialId === transferForm.materialId
-                    const invItem = inventory.find(i => i.locationId === l.locationId && i.materialId === transferForm.materialId)
-                    return invItem && invItem.currentStock > 0
-                  }).map(l => {
-                    const invItem = inventory.find(i => i.locationId === l.locationId && i.materialId === transferForm.materialId)
-                    return { value: l.locationId, sub: `Stock: ${invItem ? invItem.currentStock : 0} ${transferForm.unit || "PCS"}` }
-                  })}
-                />
-                {transferForm.locationId && (
-                  <button type="button" onClick={() => handleTransferLocationChange("")} className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 z-10 bg-background"><X size={14} /></button>
-                )}
+            {transferForm.materialId && (
+              <div className="space-y-1.5 animate-fade-in-up">
+                <Label>Source Location (From) <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <Combobox
+                    value={transferForm.locationId}
+                    onChange={val => handleTransferLocationChange(val.toUpperCase())}
+                    placeholder="Select source location..." 
+                    className="font-mono uppercase w-full border-blue-500/30" 
+                    options={locations.filter(l => {
+                      if (isSwapMode) return l.materialId === transferForm.materialId
+                      const invItem = inventory.find(i => i.locationId === l.locationId && i.materialId === transferForm.materialId)
+                      return invItem && invItem.currentStock > 0
+                    }).map(l => {
+                      const invItem = inventory.find(i => i.locationId === l.locationId && i.materialId === transferForm.materialId)
+                      return { value: l.locationId, sub: `Stock: ${invItem ? invItem.currentStock : 0} ${transferForm.unit || "PCS"}` }
+                    })}
+                  />
+                  {transferForm.locationId && (
+                    <button type="button" onClick={() => handleTransferLocationChange("")} className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 z-10 bg-background"><X size={14} /></button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-1.5">
               <Label>Destination Location (To) <span className="text-destructive">*</span></Label>

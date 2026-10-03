@@ -17,6 +17,7 @@ const emptyForm = { id: "", name: "", description: "", category: "", unit: "PCS"
 export default function MaterialMaster() {
   const materials = useWarehouseStore(s => s.materialMasterBase ?? [])
   const locations = useWarehouseStore(s => s.locations ?? [])
+  const inventory = useWarehouseStore(s => s.inventory ?? [])
   const addMaterial = useWarehouseStore(s => s.addMaterial)
   const updateMaterial = useWarehouseStore(s => s.updateMaterial)
   const deleteMaterial = useWarehouseStore(s => s.deleteMaterial)
@@ -26,6 +27,7 @@ export default function MaterialMaster() {
   const [catFilter, setCatFilter] = React.useState("all")
   const [open, setOpen] = React.useState(false)
   const [editing, setEditing] = React.useState(null)
+  const [viewLocationsId, setViewLocationsId] = React.useState(null)
   const [form, setForm] = React.useState(emptyForm)
 
   const uniqueCategories = React.useMemo(() => {
@@ -137,35 +139,63 @@ export default function MaterialMaster() {
         </CardHeader>
         <CardContent className="p-0 overflow-auto">
           <div className="overflow-x-auto w-full">
-            <table className="w-full wms-table min-w-[600px]">
+            <table className="w-full wms-table min-w-[750px]">
               <thead>
                 <tr>
                   <th className="text-left">Material ID</th>
                   <th className="text-left">Name</th>
                   <th className="text-left">Description</th>
                   <th>Category</th>
+                  <th className="text-left">Rack Location</th>
                   <th className="text-center">Unit</th>
                   <th className="text-right">Reorder Level</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(m => (
-                  <tr key={m.id}>
-                    <td className="font-mono text-xs text-primary">{m.id}</td>
-                    <td className="font-medium text-foreground">{m.name || m.description}</td>
-                    <td className="text-muted-foreground max-w-[200px] truncate text-xs">{m.description}</td>
-                    <td className="text-center"><CategoryBadge category={m.category} /></td>
-                    <td className="text-center font-mono text-xs text-muted-foreground">{m.unit}</td>
-                    <td className="text-right font-mono text-sm text-amber-400">{m.reorderLevel}</td>
-                    <td className="text-right">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button onClick={() => openEdit(m)} className="text-muted-foreground hover:text-primary p-1 transition-colors"><Pencil size={13}/></button>
-                        <button onClick={() => handleDelete(m.id)} className="text-muted-foreground hover:text-destructive p-1 transition-colors"><Trash2 size={13}/></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(m => {
+                  // Get all locations assigned to or holding stock for this material
+                  const matLocs = locations.filter(l => 
+                    l.materialId === m.id || 
+                    inventory.some(i => i.materialId === m.id && i.locationId === l.locationId && i.currentStock > 0)
+                  )
+                  
+                  return (
+                    <tr key={m.id}>
+                      <td className="font-mono text-xs text-primary">{m.id}</td>
+                      <td className="font-medium text-foreground">{m.name || m.description}</td>
+                      <td className="text-muted-foreground max-w-[200px] truncate text-xs">{m.description}</td>
+                      <td className="text-center"><CategoryBadge category={m.category} /></td>
+                      <td>
+                        {matLocs.length > 0 ? (
+                          <div 
+                            className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => setViewLocationsId(m.id)}
+                          >
+                            <span className="font-mono text-[11px] bg-secondary/50 px-2 py-0.5 rounded border border-border">
+                              {matLocs[0].locationId}
+                            </span>
+                            {matLocs.length > 1 && (
+                              <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 rounded-full">
+                                +{matLocs.length - 1}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="text-center font-mono text-xs text-muted-foreground">{m.unit}</td>
+                      <td className="text-right font-mono text-sm text-amber-400">{m.reorderLevel}</td>
+                      <td className="text-right">
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => openEdit(m)} className="text-muted-foreground hover:text-primary p-1 transition-colors"><Pencil size={13}/></button>
+                          <button onClick={() => handleDelete(m.id)} className="text-muted-foreground hover:text-destructive p-1 transition-colors"><Trash2 size={13}/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -234,6 +264,54 @@ export default function MaterialMaster() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" form="material-form">{editing ? "Save Changes" : "Add Material"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Locations Modal */}
+      <Dialog open={!!viewLocationsId} onOpenChange={(val) => !val && setViewLocationsId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rack Locations</DialogTitle>
+            <DialogDescription>
+              All locations assigned to or holding stock for material <span className="font-mono font-bold text-primary">{viewLocationsId}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+            {viewLocationsId && (() => {
+              const matLocs = locations.filter(l => 
+                l.materialId === viewLocationsId || 
+                inventory.some(i => i.materialId === viewLocationsId && i.locationId === l.locationId && i.currentStock > 0)
+              )
+              
+              if (matLocs.length === 0) return <p className="text-sm text-muted-foreground italic text-center py-4">No locations found.</p>
+
+              return matLocs.map(l => {
+                const isPrimary = l.materialId === viewLocationsId
+                const invItem = inventory.find(i => i.materialId === viewLocationsId && i.locationId === l.locationId)
+                const stock = invItem ? invItem.currentStock : 0
+                
+                return (
+                  <div key={l.locationId} className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/20">
+                    <div>
+                      <p className="font-mono text-sm font-bold">{l.locationId}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {isPrimary ? "Primary Assigned" : "Secondary (Holds Stock)"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-mono font-bold ${stock > 0 ? "text-emerald-500" : "text-muted-foreground"}`}>
+                        {stock} <span className="text-[10px] uppercase">{l.unit || "PCS"}</span>
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">Current Stock</p>
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+          <DialogFooter className="sm:justify-center">
+            <Button variant="outline" size="sm" onClick={() => setViewLocationsId(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

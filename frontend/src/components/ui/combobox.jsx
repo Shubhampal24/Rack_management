@@ -28,6 +28,7 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
   }, [])
 
   const filtered = options.filter(o => {
+    if (query === value) return true // Show all options if user hasn't started typing a new search
     const text = typeof o === 'string' ? o : o.value
     return text.toLowerCase().includes(query.toLowerCase())
   })
