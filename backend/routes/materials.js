@@ -21,7 +21,7 @@ router.get('/', requireAuth, async (req, res, next) => {
  */
 router.post('/', requireAuth, async (req, res, next) => {
   try {
-    const { id, name, description, category, unit, reorderLevel } = req.body
+    const { id, name, description, category, unit, reorderLevel, openingStock } = req.body
 
     if (!id || !name) {
       return res.status(400).json({ error: 'Material ID and Name are required.' })
@@ -36,6 +36,7 @@ router.post('/', requireAuth, async (req, res, next) => {
         existing.category = category || ''
         existing.unit = unit || 'PCS'
         existing.reorderLevel = Number(reorderLevel) || 0
+        existing.openingStock = Number(openingStock) || 0
         await existing.save()
         return res.status(201).json(existing)
       }
@@ -49,6 +50,7 @@ router.post('/', requireAuth, async (req, res, next) => {
       category: category || '',
       unit: unit || 'PCS',
       reorderLevel: Number(reorderLevel) || 0,
+      openingStock: Number(openingStock) || 0,
     })
 
     await material.save()

@@ -7,7 +7,7 @@ const AuthContext = React.createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser]       = React.useState(() => {
     try {
-      const stored = localStorage.getItem('rackos_user')
+      const stored = localStorage.getItem('hopshop_user')
       return stored ? JSON.parse(stored) : null
     } catch { return null }
   })
@@ -18,8 +18,8 @@ export function AuthProvider({ children }) {
   React.useEffect(() => {
     const handler = () => {
       setUser(null)
-      localStorage.removeItem('rackos_token')
-      localStorage.removeItem('rackos_user')
+      localStorage.removeItem('hopshop_token')
+      localStorage.removeItem('hopshop_user')
     }
     window.addEventListener('auth:logout', handler)
     return () => window.removeEventListener('auth:logout', handler)
@@ -30,8 +30,8 @@ export function AuthProvider({ children }) {
     setError(null)
     try {
       const { token, user: userData } = await authService.login(userId, pin)
-      localStorage.setItem('rackos_token', token)
-      localStorage.setItem('rackos_user', JSON.stringify(userData))
+      localStorage.setItem('hopshop_token', token)
+      localStorage.setItem('hopshop_user', JSON.stringify(userData))
       setUser(userData)
       return { ok: true }
     } catch (err) {
@@ -44,13 +44,13 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try { await authService.logout() } catch {}
-    localStorage.removeItem('rackos_token')
-    localStorage.removeItem('rackos_user')
+    localStorage.removeItem('hopshop_token')
+    localStorage.removeItem('hopshop_user')
     setUser(null)
     setError(null)
   }
 
-  const isAuthenticated = !!user && !!localStorage.getItem('rackos_token')
+  const isAuthenticated = !!user && !!localStorage.getItem('hopshop_token')
 
   return (
     <AuthContext.Provider value={{ user, loading, error, isAuthenticated, login, logout }}>

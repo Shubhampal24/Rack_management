@@ -113,7 +113,7 @@ export default function StockMovement() {
   }, [materials, form.materialId])
 
   const filtered = React.useMemo(() => {
-    return [...enrichedMovements].reverse().filter(m => {
+    return enrichedMovements.filter(m => {
       const q = search.toLowerCase()
       const matchSearch = !q || m.materialId?.toLowerCase().includes(q) || m.materialDesc?.toLowerCase().includes(q) || m.locationId?.toLowerCase().includes(q) || m.reference?.toLowerCase().includes(q)
       const matchType = typeFilter === "all" || m.type === typeFilter

@@ -27,8 +27,7 @@ export default function Login() {
     setError('')
 
     if (!userId.trim()) { setError('Please enter your User ID.'); return }
-    if (!pin.trim())    { setError('Please enter your PIN.'); return }
-    if (!/^\d{4,8}$/.test(pin)) { setError('PIN must be 4–8 digits.'); return }
+    if (!pin.trim())    { setError('Please enter your password.'); return }
 
     setSubmitting(true)
     const result = await login(userId.trim(), pin.trim())
@@ -53,7 +52,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-2xl shadow-blue-500/30 mb-4">
             <Warehouse size={28} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold gradient-text mb-1">RackOS</h1>
+          <h1 className="text-3xl font-bold gradient-text mb-1">HopShop</h1>
           <p className="text-sm text-muted-foreground">Warehouse Management System</p>
         </div>
 
@@ -82,18 +81,17 @@ export default function Login() {
               </div>
             </div>
 
-            {/* PIN */}
+            {/* Password */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">PIN</label>
+              <label className="text-sm font-medium text-foreground">Password</label>
               <div className="relative">
                 <KeyRound size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type={showPin ? 'text' : 'password'}
                   value={pin}
-                  onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                  placeholder="Enter your PIN"
+                  onChange={e => setPin(e.target.value)}
+                  placeholder="Enter your password"
                   autoComplete="current-password"
-                  inputMode="numeric"
                   className="w-full pl-9 pr-12 h-11 rounded-lg border border-border bg-card/60 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-colors placeholder:text-muted-foreground font-mono tracking-widest"
                 />
                 <button
@@ -128,13 +126,15 @@ export default function Login() {
           </form>
 
           {/* Hint */}
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            Default credentials: <span className="font-mono text-foreground">WM@123</span> / <span className="font-mono text-foreground">1234</span>
-          </p>
+          <div className="text-center text-xs text-muted-foreground mt-6 space-y-1">
+            <p>Test credentials (Password: <span className="font-mono text-foreground">WM@123</span>):</p>
+            <p>Admin: <span className="font-mono text-foreground">admin</span> | Godown: <span className="font-mono text-foreground">godown</span></p>
+            <p>Purchase: <span className="font-mono text-foreground">purchase</span> | Sales: <span className="font-mono text-foreground">sales</span></p>
+          </div>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          RackOS v1.0 — Warehouse Management
+          HopShop v1.0 — Warehouse Management
         </p>
       </div>
     </div>

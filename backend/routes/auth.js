@@ -75,4 +75,34 @@ router.post('/logout', requireAuth, (req, res) => {
   res.json({ message: 'Logged out successfully.' })
 })
 
+/**
+ * POST /api/auth/register
+ * Admin only. Registers a new user.
+ */
+router.post('/register', requireAuth, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'Admin') {
+      return res.status(403).json({ error: 'Only administrators can register new users.' })
+    }
+    const { userId, name, role, pin } = req.body
+    if (!userId || !pin || !role) {
+      return res.status(400).json({ error: 'User ID, password, and role are required.' })
+    }
+    const existing = await User.findOne({ userId: userId.trim() })
+    if (existing) {
+      return res.status(400).json({ error: 'User ID already exists.' })
+    }
+    const newUser = new User({
+      userId: userId.trim(),
+      name: name || 'New User',
+      role,
+      pin
+    })
+    await newUser.save()
+    res.status(201).json({ message: 'User registered successfully', user: { userId: newUser.userId, name: newUser.name, role: newUser.role } })
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

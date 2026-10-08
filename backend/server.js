@@ -50,7 +50,7 @@ app.use(express.urlencoded({ extended: true }))
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'RackOS API',
+    service: 'HopShop API',
     version: '1.0.0',
     timestamp: new Date().toISOString()
   })
@@ -75,7 +75,7 @@ app.use(errorHandler)
 async function start() {
   await connectDB()
   app.listen(PORT, () => {
-    console.log(`🚀 RackOS API running on http://localhost:${PORT}`)
+    console.log(`🚀 HopShop API running on http://localhost:${PORT}`)
     console.log(`📋 Health: http://localhost:${PORT}/api/health`)
   })
 }

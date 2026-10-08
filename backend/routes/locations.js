@@ -99,6 +99,30 @@ router.patch('/:locationId/assign', requireAuth, async (req, res, next) => {
 
     location.materialId = materialId || ''
     await location.save()
+
+    if (materialId) {
+      const Material = (await import('../models/Material.js')).default
+      const material = await Material.findOne({ id: materialId })
+      if (material && material.openingStock > 0 && !material.openingStockAdded) {
+        const Movement = (await import('../models/Movement.js')).default
+        const openingMov = new Movement({
+          id: `MOV${Date.now()}`,
+          date: new Date().toISOString().slice(0, 10),
+          materialId: materialId,
+          locationId: locationId,
+          type: 'IN',
+          quantity: material.openingStock,
+          unit: material.unit || 'PCS',
+          reference: 'OPENING STOCK',
+          user: req.user?.name || 'Warehouse Manager',
+          notes: 'Automatic opening stock addition'
+        })
+        await openingMov.save()
+        material.openingStockAdded = true
+        await material.save()
+      }
+    }
+
     res.json(location)
   } catch (err) { next(err) }
 })

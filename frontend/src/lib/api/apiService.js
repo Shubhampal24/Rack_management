@@ -8,6 +8,7 @@ export const authService = {
   login: (userId, pin)  => api.post('/auth/login', { userId, pin }),
   me:    ()             => api.get('/auth/me'),
   logout: ()            => api.post('/auth/logout'),
+  register: (data)      => api.post('/auth/register', data),
 }
 
 // ── Racks ─────────────────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ export const movementService = {
     return api.get(`/movements${qs ? '?' + qs : ''}`)
   },
   create:   (data)     => api.post('/movements', data),
+  createBulk: (data)   => api.post('/movements/bulk', data),
   transfer: (data)     => api.post('/movements/transfer', data),
   swap:     (data)     => api.post('/movements/swap', data),
   delete:   (id)       => api.delete(`/movements/${id}`),

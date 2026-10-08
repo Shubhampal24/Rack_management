@@ -220,8 +220,13 @@ const useWarehouseStore = create((set, get) => ({
       date: movement.date || new Date().toISOString().slice(0, 10),
     }
     const newMov = await movementService.create(payload)
-    set(state => ({ movements: [...state.movements, newMov] }))
+    set(state => ({ movements: [newMov, ...state.movements] }))
     get()._recompute()
+  },
+
+  addBulkMovements: async (payload) => {
+    await movementService.createBulk(payload)
+    await get().loadAll()
   },
 
   deleteMovement: async (id) => {
@@ -258,12 +263,7 @@ const useWarehouseStore = create((set, get) => ({
 
   assignMaterial: async (locationId, materialId) => {
     await locationService.assign(locationId, materialId)
-    set(state => ({
-      locationMasterBase: state.locationMasterBase.map(l =>
-        l.locationId === locationId ? { ...l, materialId } : l
-      )
-    }))
-    get()._recompute()
+    await get().loadAll()
   },
 
   unassignMaterial: async (locationId) => {

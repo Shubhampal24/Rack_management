@@ -6,7 +6,7 @@ const UserSchema = new mongoose.Schema({
   userId:      { type: String, required: true, unique: true, trim: true },  // WM@123
   pin:         { type: String, required: true },                              // hashed 1234
   name:        { type: String, default: 'Warehouse Manager' },
-  role:        { type: String, enum: ['admin', 'operator', 'viewer'], default: 'admin' },
+  role:        { type: String, enum: ['Admin', 'Godown keeper', 'Purchase dept', 'Sales dept'], default: 'Admin' },
   createdAt:   { type: Date, default: Date.now },
   lastLogin:   { type: Date },
 })

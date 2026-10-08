@@ -4,7 +4,7 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api'
 
 function getToken() {
-  return localStorage.getItem('rackos_token')
+  return localStorage.getItem('hopshop_token')
 }
 
 async function request(method, path, body) {
@@ -20,8 +20,8 @@ async function request(method, path, body) {
 
   // Handle 401 — token expired or invalid
   if (res.status === 401) {
-    localStorage.removeItem('rackos_token')
-    localStorage.removeItem('rackos_user')
+    localStorage.removeItem('hopshop_token')
+    localStorage.removeItem('hopshop_user')
     window.dispatchEvent(new Event('auth:logout'))
     const data = await res.json().catch(() => ({}))
     throw new Error(data.error || 'Session expired. Please log in again.')

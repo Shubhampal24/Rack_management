@@ -11,6 +11,7 @@ import Dashboard    from '@/pages/Dashboard'
 import RackMap      from '@/pages/RackMap'
 import Inventory    from '@/pages/Inventory'
 import StockMovement from '@/pages/StockMovement'
+import Shipments    from '@/pages/Shipments'
 import MaterialMaster from '@/pages/MaterialMaster'
 import LocationMaster from '@/pages/LocationMaster'
 import RackLabels   from '@/pages/RackLabels'
@@ -94,6 +95,7 @@ function AppRoutes() {
         <Route path="/rack-map"     element={<RackMap />} />
         <Route path="/inventory"    element={<Inventory />} />
         <Route path="/movements"    element={<StockMovement />} />
+        <Route path="/shipment"     element={<Shipments />} />
         <Route path="/materials"    element={<MaterialMaster />} />
         <Route path="/locations"    element={<LocationMaster />} />
         <Route path="/rack-manager" element={<RackManager />} />

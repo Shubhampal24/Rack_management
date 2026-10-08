@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext"
 import {
   LayoutDashboard, Map, Package, ArrowLeftRight, Database,
   MapPin, Tag, Settings, BookOpen, Warehouse, ChevronLeft, ChevronRight,
-  AlertTriangle, LogOut, UserCircle2
+  AlertTriangle, LogOut, UserCircle2, Truck
 } from "lucide-react"
 
 const navItems = [
@@ -14,6 +14,7 @@ const navItems = [
   { path: "/rack-map",    icon: Map,             label: "Rack Map",        group: "overview" },
   { path: "/inventory",   icon: Package,         label: "Inventory",       group: "operations" },
   { path: "/movements",   icon: ArrowLeftRight,  label: "Stock Movement",  group: "operations" },
+  { path: "/shipment",    icon: Truck,           label: "Shipments",       group: "operations" },
   { path: "/materials",   icon: Database,        label: "Material Master", group: "master" },
   { path: "/locations",   icon: MapPin,          label: "Location Master", group: "master" },
   { path: "/rack-manager",icon: Settings,        label: "Rack Manager",    group: "master" },
@@ -56,7 +57,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) 
           <Warehouse size={16} className="text-white" />
         </div>
         <div className={cn("min-w-0", collapsed && "md:hidden")}>
-          <p className="text-sm font-bold gradient-text truncate">RackOS</p>
+          <p className="text-sm font-bold gradient-text truncate">HopShop</p>
           <p className="text-[10px] text-muted-foreground truncate">Warehouse Management</p>
         </div>
       </div>
@@ -110,7 +111,14 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) 
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-foreground truncate">{user?.name || 'Warehouse Manager'}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{user?.userId || ''}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[10px] text-muted-foreground truncate">{user?.userId || ''}</p>
+                {user?.role && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary uppercase tracking-wider">
+                    {user.role}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )}

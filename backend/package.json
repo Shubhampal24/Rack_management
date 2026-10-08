@@ -1,7 +1,7 @@
 {
-  "name": "rackos-backend",
+  "name": "hopshop-backend",
   "version": "1.0.0",
-  "description": "RackOS Warehouse Management System - Backend API",
+  "description": "HopShop Warehouse Management System - Backend API",
   "main": "server.js",
   "type": "module",
   "scripts": {

@@ -224,4 +224,78 @@ router.get('/stats', requireAuth, async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+/**
+ * POST /api/movements/bulk
+ * Body: { reference, type, date, user, notes, items: [{ materialId, locationId, quantity }] }
+ */
+router.post('/bulk', requireAuth, async (req, res, next) => {
+  try {
+    const { reference, type, date, user, notes, items } = req.body
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items must be a non-empty array.' })
+    }
+    if (!['IN', 'OUT'].includes(type)) {
+      return res.status(400).json({ error: 'type must be "IN" or "OUT".' })
+    }
+
+    for (const item of items) {
+      if (Number(item.quantity) <= 0) {
+        return res.status(400).json({ error: 'All item quantities must be greater than 0.' })
+      }
+    }
+
+    // Clean all items materialIds
+    const cleanItems = items.map(item => {
+      const rawId = (item.materialId || '').trim()
+      const cleanId = rawId.includes(' - ') ? rawId.split(' - ')[0].trim() : rawId.includes(' (') ? rawId.split(' (')[0].trim() : rawId
+      return { ...item, materialId: cleanId.toUpperCase(), quantity: Number(item.quantity) }
+    })
+
+    if (type === 'OUT') {
+      const reqAgg = {}
+      for (const item of cleanItems) {
+        const key = `${item.locationId}_${item.materialId}`
+        reqAgg[key] = (reqAgg[key] || 0) + item.quantity
+      }
+
+      for (const key in reqAgg) {
+        const [loc, mat] = key.split('_')
+        const [stockRes] = await Movement.aggregate([
+          { $match: { locationId: loc, materialId: mat, isDeleted: { $ne: true } } },
+          { $group: {
+              _id: null,
+              totalIn: { $sum: { $cond: [{ $eq: ['$type', 'IN'] }, '$quantity', 0] } },
+              totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUT'] }, '$quantity', 0] } }
+          }}
+        ])
+        const currentStock = stockRes ? stockRes.totalIn - stockRes.totalOut : 0
+        if (currentStock < reqAgg[key]) {
+          return res.status(400).json({ error: `Insufficient stock for ${mat} at ${loc}. Available: ${currentStock}, Requested: ${reqAgg[key]}` })
+        }
+      }
+    }
+
+    const baseData = {
+      date: date || new Date().toISOString().slice(0, 10),
+      type,
+      reference: reference || '',
+      user: user || req.user?.name || 'Warehouse Manager',
+      notes: notes || '',
+    }
+
+    const docs = cleanItems.map((item, index) => ({
+      ...baseData,
+      id: `MOV${Date.now()}-${index}`,
+      materialId: item.materialId,
+      locationId: item.locationId,
+      quantity: item.quantity,
+      unit: item.unit || 'PCS'
+    }))
+
+    await Movement.insertMany(docs)
+    res.status(201).json({ message: 'Bulk movement created', count: docs.length })
+  } catch (err) { next(err) }
+})
+
 export default router

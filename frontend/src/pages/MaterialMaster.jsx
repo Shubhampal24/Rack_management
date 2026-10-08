@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast"
 import { CATEGORIES, UNITS, exportToCSV } from "@/lib/utils"
 import { Plus, Search, Pencil, Trash2, Database, Info, Download } from "lucide-react"
 
-const emptyForm = { id: "", name: "", description: "", category: "", unit: "PCS", reorderLevel: 10 }
+const emptyForm = { id: "", name: "", description: "", category: "", unit: "PCS", reorderLevel: 10, openingStock: 0 }
 
 export default function MaterialMaster() {
   const materials = useWarehouseStore(s => s.materialMasterBase ?? [])
@@ -43,7 +43,7 @@ export default function MaterialMaster() {
   })
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setOpen(true) }
-  const openEdit = (m) => { setEditing(m.id); setForm({ id: m.id, name: m.name || m.description, description: m.description, category: m.category, unit: m.unit, reorderLevel: m.reorderLevel }); setOpen(true) }
+  const openEdit = (m) => { setEditing(m.id); setForm({ id: m.id, name: m.name || m.description, description: m.description, category: m.category, unit: m.unit, reorderLevel: m.reorderLevel, openingStock: 0 }); setOpen(true) }
 
   const handleSubmit = async (e) => {
     e?.preventDefault()
@@ -54,7 +54,7 @@ export default function MaterialMaster() {
         toast({ title: "Material updated", variant: "success" })
       } else {
         if (materials.find(m => m.id === form.id)) { toast({ title: "ID already exists", variant: "destructive" }); return }
-        await addMaterial({ ...form, reorderLevel: Number(form.reorderLevel) })
+        await addMaterial({ ...form, reorderLevel: Number(form.reorderLevel), openingStock: Number(form.openingStock) || 0 })
         toast({ title: "Material added", variant: "success" })
       }
       setOpen(false)
@@ -259,6 +259,15 @@ export default function MaterialMaster() {
                 <Input type="number" min="0" value={form.reorderLevel} onChange={e => setForm({ ...form, reorderLevel: e.target.value })} className="w-full" />
               </div>
             </div>
+
+            {!editing && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className="space-y-1.5">
+                  <Label>Opening Stock</Label>
+                  <Input type="number" min="0" value={form.openingStock} onChange={e => setForm({ ...form, openingStock: e.target.value })} className="w-full" placeholder="Initial quantity" />
+                </div>
+              </div>
+            )}
 
           </form>
           <DialogFooter>
