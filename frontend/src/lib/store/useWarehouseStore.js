@@ -84,7 +84,11 @@ export function computeDerivedData(locationMasterBase, materialMasterBase, movem
     const materialDesc = mat ? (mat.name || mat.description) : ''
     const category   = mat?.category || ''
     const unit       = mat?.unit || ''
-    return { ...loc, locationId, materialId, materialDesc, category, unit, quantity, status }
+    const locInMovs  = movements.filter(m => m.locationId === locationId && m.type === 'IN')
+    const latestInMov = locInMovs.length > 0 ? locInMovs[locInMovs.length - 1] : null
+    const expiryDate = loc.expiryDate || latestInMov?.expiryDate || ''
+    const batch      = loc.batch || latestInMov?.batch || ''
+    return { ...loc, locationId, materialId, materialDesc, category, unit, quantity, status, expiryDate, batch }
   })
 
   const locationByLocId = {}
@@ -122,7 +126,21 @@ export function computeDerivedData(locationMasterBase, materialMasterBase, movem
 
   const rackLabels = locations
     .filter(l => l.locationId)
-    .map(l => ({ locationId: l.locationId, rack: l.rack, bay: l.bay, level: l.level, slot: l.slot, materialDesc: l.materialDesc, category: l.category, printStatus: 'READY' }))
+    .map(l => {
+      const finalId = l.materialId ? `${l.locationId}-${l.materialId}` : l.locationId
+      return {
+        locationId: l.locationId,
+        materialId: l.materialId || '',
+        finalId,
+        rack: l.rack,
+        bay: l.bay,
+        level: l.level,
+        slot: l.slot,
+        materialDesc: l.materialDesc,
+        category: l.category,
+        printStatus: 'READY'
+      }
+    })
 
   const enrichedMovements = movements.map(m => {
     const mat = materialMap[m.materialId]
@@ -261,25 +279,20 @@ const useWarehouseStore = create((set, get) => ({
 
   // ─── LOCATION MASTER ACTIONS ──────────────────────────────────────────
 
-  assignMaterial: async (locationId, materialId) => {
-    await locationService.assign(locationId, materialId)
+  assignMaterial: async (locationId, payload) => {
+    await locationService.assign(locationId, payload)
     await get().loadAll()
   },
 
   unassignMaterial: async (locationId) => {
     await locationService.unassign(locationId)
-    set(state => ({
-      locationMasterBase: state.locationMasterBase.map(l =>
-        l.locationId === locationId ? { ...l, materialId: '' } : l
-      )
-    }))
-    get()._recompute()
+    await get().loadAll()
   },
 
-  addLocation: async (rack, bay, level, slot, materialId = '', batch = '', notes = '') => {
+  addLocation: async (rack, bay, level, slot, materialId = '', batch = '', expiryDate = '', notes = '') => {
     const locationId = computeLocationId(rack, bay, level, slot)
     if (!locationId) return
-    const newLoc = await locationService.create({ rack, bay, level, slot, locationId, materialId, batch, notes })
+    const newLoc = await locationService.create({ rack, bay, level, slot, locationId, materialId, batch, expiryDate, notes })
     set(state => ({ locationMasterBase: [...state.locationMasterBase, newLoc] }))
     get()._recompute()
   },

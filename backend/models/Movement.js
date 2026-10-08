@@ -9,6 +9,8 @@ const MovementSchema = new mongoose.Schema({
   type:        { type: String, enum: ['IN', 'OUT'], required: true },
   quantity:    { type: Number, required: true, min: 0 },
   unit:        { type: String, default: 'PCS' },
+  expiryDate:  { type: String, default: '' },                  // YYYY-MM-DD
+  batch:       { type: String, default: '' },
   reference:   { type: String, default: '' },
   user:        { type: String, default: 'Warehouse Manager' },
   notes:       { type: String, default: '' },

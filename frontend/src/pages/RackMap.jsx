@@ -3,10 +3,12 @@ import useWarehouseStore from "@/lib/store/useWarehouseStore"
 import { Card, CardContent } from "@/components/ui/card"
 import { StockBadge, CategoryBadge, LocationBadge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Combobox } from "@/components/ui/combobox"
+import { useToast } from "@/components/ui/toast"
 import { LEVEL_ORDER, LEVEL_LABELS } from "@/lib/utils"
 import { cn } from "@/lib/utils"
-import { X, Package, Layers, ChevronRight, Activity, ArrowDownRight, ArrowUpRight, ShieldCheck } from "lucide-react"
+import { X, Package, Layers, ChevronRight, Activity, ArrowDownRight, ArrowUpRight, ShieldCheck, ArrowDownCircle, ArrowUpCircle, Calendar } from "lucide-react"
 
 function RackCell({ location, onClick, rackCellState }) {
   const isOccupied = rackCellState === "occupied"
@@ -91,14 +93,127 @@ export default function RackMap() {
   const movements = useWarehouseStore(s => s.enrichedMovements ?? [])
   const materials = useWarehouseStore(s => s.materialMasterBase ?? [])
   const assignMaterial = useWarehouseStore(s => s.assignMaterial)
+  const addMovement = useWarehouseStore(s => s.addMovement)
+  const currentUser = useWarehouseStore(s => s.currentUser || "Warehouse Manager")
+  const { toast } = useToast()
 
   const [selectedCell, setSelectedCell] = React.useState(null)
   const [selectedBay, setSelectedBay] = React.useState("all")
   
+  // Assign Material State (with opening stock, expiry date, batch)
   const [assignMatId, setAssignMatId] = React.useState("")
+  const [openingStock, setOpeningStock] = React.useState("")
+  const [assignExpiry, setAssignExpiry] = React.useState("")
+  const [assignBatch, setAssignBatch] = React.useState("")
   const [isAssigning, setIsAssigning] = React.useState(false)
 
-  React.useEffect(() => { setAssignMatId("") }, [selectedCell])
+  // Quick Stock Movement State (Stock IN / Stock OUT)
+  const [movementTab, setMovementTab] = React.useState("IN")
+  const [movQty, setMovQty] = React.useState("")
+  const [movExpiry, setMovExpiry] = React.useState("")
+  const [movBatch, setMovBatch] = React.useState("")
+  const [movRef, setMovRef] = React.useState("")
+  const [isMoving, setIsMoving] = React.useState(false)
+
+  React.useEffect(() => {
+    setAssignMatId("")
+    setOpeningStock("")
+    setAssignExpiry("")
+    setAssignBatch("")
+    setMovQty("")
+    setMovExpiry("")
+    setMovBatch("")
+    setMovRef("")
+  }, [selectedCell?.locationId])
+
+  const handleAssignMaterial = async () => {
+    if (!selectedCell || !assignMatId) return
+    setIsAssigning(true)
+    try {
+      const numQty = openingStock !== "" ? Number(openingStock) : 0
+      await assignMaterial(selectedCell.locationId, {
+        materialId: assignMatId,
+        quantity: numQty > 0 ? numQty : undefined,
+        expiryDate: assignExpiry || undefined,
+        batch: assignBatch || undefined,
+      })
+
+      toast({
+        title: "Material Assigned",
+        description: `${assignMatId} assigned to ${selectedCell.locationId}${numQty > 0 ? ` with ${numQty} opening stock` : ""}${assignExpiry ? ` (Exp: ${assignExpiry})` : ""}`,
+        variant: "success",
+      })
+
+      const updatedLocations = useWarehouseStore.getState().locations
+      const newLoc = updatedLocations.find(l => l.locationId === selectedCell.locationId)
+      if (newLoc) setSelectedCell(newLoc)
+    } catch(err) {
+      toast({
+        title: "Assignment Failed",
+        description: err.message || "Failed to assign material to slot.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAssigning(false)
+    }
+  }
+
+  const handleStockMovement = async () => {
+    if (!selectedCell || !selectedCell.materialId) return
+    const qty = Number(movQty)
+    if (!qty || qty <= 0) {
+      toast({ title: "Invalid quantity", description: "Quantity must be greater than 0.", variant: "destructive" })
+      return
+    }
+
+    const currentStock = cellInv ? cellInv.currentStock : Number(selectedCell.quantity || 0)
+    if (movementTab === "OUT" && qty > currentStock) {
+      toast({
+        title: "Insufficient stock",
+        description: `Cannot move out ${qty}. Available stock is ${currentStock}.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsMoving(true)
+    try {
+      await addMovement({
+        materialId: selectedCell.materialId,
+        locationId: selectedCell.locationId,
+        type: movementTab,
+        quantity: qty,
+        unit: selectedCell.unit || "PCS",
+        expiryDate: movExpiry || undefined,
+        batch: movBatch || undefined,
+        reference: movRef || (movementTab === "IN" ? "DIRECT IN" : "DIRECT OUT"),
+        user: currentUser,
+      })
+
+      toast({
+        title: `Stock ${movementTab} Successful`,
+        description: `${movementTab === "IN" ? "+" : "-"}${qty} ${selectedCell.unit || "PCS"} for ${selectedCell.materialId}`,
+        variant: "success",
+      })
+
+      setMovQty("")
+      setMovExpiry("")
+      setMovBatch("")
+      setMovRef("")
+
+      const updatedLocations = useWarehouseStore.getState().locations
+      const newLoc = updatedLocations.find(l => l.locationId === selectedCell.locationId)
+      if (newLoc) setSelectedCell(newLoc)
+    } catch (err) {
+      toast({
+        title: `Stock ${movementTab} Failed`,
+        description: err.message || "Failed to record movement.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsMoving(false)
+    }
+  }
 
   // Handle ESC to close drawer
   React.useEffect(() => {
@@ -435,65 +550,232 @@ export default function RackMap() {
 
               {/* Material Information Card */}
               {selectedCell.materialDesc ? (
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <div className="p-2 rounded-lg bg-primary/20 text-primary shrink-0 mt-0.5">
-                      <Package size={16} />
+                <>
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-2 rounded-lg bg-primary/20 text-primary shrink-0 mt-0.5">
+                        <Package size={16} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Assigned Material</p>
+                        <h4 className="text-sm font-bold text-foreground leading-tight mt-0.5">
+                          {selectedCell.materialDesc}
+                        </h4>
+                        <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                          {selectedCell.materialId}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Assigned Material</p>
-                      <h4 className="text-sm font-bold text-foreground leading-tight mt-0.5">
-                        {selectedCell.materialDesc}
-                      </h4>
-                      <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
-                        {selectedCell.materialId}
-                      </p>
-                    </div>
+
+                    {selectedCell.category && (
+                      <div className="pt-2 border-t border-border/30 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Category:</span>
+                        <CategoryBadge category={selectedCell.category} />
+                      </div>
+                    )}
+
+                    {selectedCell.expiryDate && (
+                      <div className="pt-2 border-t border-border/30 flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <Calendar size={13} className="text-primary" /> Expiry Date:
+                        </span>
+                        <span className="font-mono font-bold text-foreground">{selectedCell.expiryDate}</span>
+                      </div>
+                    )}
+
+                    {selectedCell.batch && (
+                      <div className="pt-1.5 flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Batch / Lot:</span>
+                        <span className="font-mono font-semibold text-foreground">{selectedCell.batch}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {selectedCell.category && (
-                    <div className="pt-2 border-t border-border/30 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Category:</span>
-                      <CategoryBadge category={selectedCell.category} />
+                  {/* Quick Stock Movement Section (Stock IN / Stock OUT) */}
+                  <div className="rounded-xl border border-border bg-card/60 p-3.5 space-y-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Activity size={13} className="text-primary" /> Stock Operation
+                      </span>
+                      {/* IN / OUT Mode Toggle */}
+                      <div className="flex bg-secondary/50 p-0.5 rounded-lg border border-border/50 text-[11px] font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setMovementTab("IN")}
+                          className={cn(
+                            "px-2.5 py-1 rounded-md transition-all flex items-center gap-1",
+                            movementTab === "IN"
+                              ? "bg-emerald-600 text-white shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <ArrowDownCircle size={12} /> Stock IN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMovementTab("OUT")}
+                          className={cn(
+                            "px-2.5 py-1 rounded-md transition-all flex items-center gap-1",
+                            movementTab === "OUT"
+                              ? "bg-red-600 text-white shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <ArrowUpCircle size={12} /> Stock OUT
+                        </button>
+                      </div>
                     </div>
-                  )}
-                </div>
+
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-[11px] font-medium text-muted-foreground">
+                            Quantity {selectedCell.unit ? `(${selectedCell.unit})` : ""} <span className="text-destructive">*</span>
+                          </label>
+                          {movementTab === "OUT" && cellInv && (
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Available: <strong className="text-foreground">{cellInv.currentStock}</strong>
+                            </span>
+                          )}
+                        </div>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          placeholder="Enter quantity..."
+                          value={movQty}
+                          onChange={e => setMovQty(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+
+                      {movementTab === "IN" && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-medium text-muted-foreground block mb-1">
+                              Expiry Date (Optional)
+                            </label>
+                            <Input
+                              type="date"
+                              value={movExpiry}
+                              onChange={e => setMovExpiry(e.target.value)}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-medium text-muted-foreground block mb-1">
+                              Batch # (Optional)
+                            </label>
+                            <Input
+                              placeholder="e.g. B-01"
+                              value={movBatch}
+                              onChange={e => setMovBatch(e.target.value)}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
+                          Reference / Note (Optional)
+                        </label>
+                        <Input
+                          placeholder={movementTab === "IN" ? "e.g. PO-1029 / Delivery" : "e.g. Issue to Floor / Order"}
+                          value={movRef}
+                          onChange={e => setMovRef(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+
+                      <Button
+                        onClick={handleStockMovement}
+                        disabled={!movQty || Number(movQty) <= 0 || isMoving}
+                        className={cn(
+                          "w-full text-xs h-8 font-bold text-white transition-all shadow-sm",
+                          movementTab === "IN"
+                            ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20"
+                            : "bg-red-600 hover:bg-red-700 shadow-red-600/20"
+                        )}
+                      >
+                        {isMoving
+                          ? "Processing..."
+                          : movementTab === "IN"
+                          ? `+ Confirm Stock IN (${movQty || 0} ${selectedCell.unit || ""})`
+                          : `- Confirm Stock OUT (${movQty || 0} ${selectedCell.unit || ""})`
+                        }
+                      </Button>
+                    </div>
+                  </div>
+                </>
               ) : (
-                <div className="py-5 px-4 rounded-xl border border-dashed border-border/60 bg-secondary/10 text-center space-y-4">
+                <div className="py-4 px-4 rounded-xl border border-dashed border-border/60 bg-secondary/10 text-center space-y-3.5">
                   <div>
-                    <Package size={24} className="mx-auto text-muted-foreground/40 mb-2" />
+                    <Package size={22} className="mx-auto text-muted-foreground/40 mb-1.5" />
                     <p className="text-xs font-medium text-foreground">No Material Assigned</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      This location slot is free. Assign a material to begin storing stock here.
+                      This location slot is free. Assign a material and optional opening stock here.
                     </p>
                   </div>
                   
-                  <div className="space-y-2 text-left bg-background p-3 rounded-lg border border-border/40 shadow-sm">
-                    <label className="text-[11px] font-semibold text-foreground">Assign Material</label>
-                    <Combobox
-                      options={materials.map(m => ({ value: m.id, label: m.name, sub: m.id }))}
-                      value={assignMatId}
-                      onChange={setAssignMatId}
-                      placeholder="Search and select material..."
-                      className="w-full"
-                    />
+                  <div className="space-y-2.5 text-left bg-background p-3.5 rounded-lg border border-border/40 shadow-sm">
+                    <div>
+                      <label className="text-[11px] font-semibold text-foreground block mb-1">
+                        Assign Material <span className="text-destructive">*</span>
+                      </label>
+                      <Combobox
+                        options={materials.map(m => ({ value: m.id, label: m.name || m.description, sub: `${m.id} · Unit: ${m.unit || 'PCS'}` }))}
+                        value={assignMatId}
+                        onChange={setAssignMatId}
+                        placeholder="Search and select material..."
+                        className="w-full text-xs"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-semibold text-foreground block mb-1">
+                          Opening Stock (Qty)
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                          value={openingStock}
+                          onChange={e => setOpeningStock(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-foreground block mb-1">
+                          Expiry Date (Optional)
+                        </label>
+                        <Input
+                          type="date"
+                          value={assignExpiry}
+                          onChange={e => setAssignExpiry(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-semibold text-foreground block mb-1">
+                        Batch / Lot # (Optional)
+                      </label>
+                      <Input
+                        placeholder="e.g. LOT-2026-A"
+                        value={assignBatch}
+                        onChange={e => setAssignBatch(e.target.value)}
+                        className="h-8 text-xs font-mono"
+                      />
+                    </div>
+
                     <Button 
-                      className="w-full text-xs h-8 mt-2" 
+                      className="w-full text-xs h-8 mt-1 font-bold" 
                       disabled={!assignMatId || isAssigning}
-                      onClick={async () => {
-                        try {
-                          setIsAssigning(true)
-                          await assignMaterial(selectedCell.locationId, assignMatId)
-                          // Re-fetch the updated cell from the store to refresh the drawer UI immediately
-                          const updatedLocations = useWarehouseStore.getState().locations
-                          const newLoc = updatedLocations.find(l => l.locationId === selectedCell.locationId)
-                          if (newLoc) setSelectedCell(newLoc)
-                        } catch(err) {
-                          console.error(err)
-                        } finally {
-                          setIsAssigning(false)
-                        }
-                      }}
+                      onClick={handleAssignMaterial}
                     >
                       {isAssigning ? "Assigning..." : "Assign to Location"}
                     </Button>

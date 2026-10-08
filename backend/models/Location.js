@@ -9,6 +9,7 @@ const LocationSchema = new mongoose.Schema({
   slot:        { type: String, required: true, uppercase: true, trim: true },
   materialId:  { type: String, default: '' },     // assigned material (empty if none)
   batch:       { type: String, default: '' },
+  expiryDate:  { type: String, default: '' },    // YYYY-MM-DD
   notes:       { type: String, default: '' },
   isDeleted:   { type: Boolean, default: false },
   createdAt:   { type: Date, default: Date.now },

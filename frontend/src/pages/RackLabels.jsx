@@ -7,15 +7,17 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Printer, Tag, CheckSquare, Square } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 
-function LocationQRCode({ locationId }) {
+function LocationQRCode({ value }) {
   return (
     <div className="w-16 h-16 rounded-lg bg-white border border-border/80 flex items-center justify-center mb-3 mx-auto p-1 shadow-sm">
-      <QRCodeSVG value={locationId} size={56} bgColor="#ffffff" fgColor="#111827" level="M" />
+      <QRCodeSVG value={value} size={56} bgColor="#ffffff" fgColor="#111827" level="M" />
     </div>
   )
 }
 
 function LabelCard({ loc, selected, onToggle }) {
+  const finalId = loc.finalId || (loc.materialId ? `${loc.locationId}-${loc.materialId}` : loc.locationId)
+
   return (
     <div
       onClick={() => onToggle(loc.locationId)}
@@ -24,9 +26,16 @@ function LabelCard({ loc, selected, onToggle }) {
       <div className="absolute top-2 right-2 no-print">
         {selected ? <CheckSquare size={16} className="text-primary"/> : <Square size={16} className="text-muted-foreground"/>}
       </div>
-      {/* Stable deterministic QR Code */}
-      <LocationQRCode locationId={loc.locationId} />
-      <p className="font-mono text-xs font-bold text-foreground text-center mb-2 tracking-wide">{loc.locationId}</p>
+      {/* Stable deterministic QR Code encoding the final ID */}
+      <LocationQRCode value={finalId} />
+      <p className="font-mono text-xs font-bold text-foreground text-center mb-1 tracking-wide break-all" title={finalId}>
+        {finalId}
+      </p>
+      {loc.materialId && (
+        <p className="text-[9px] font-mono text-primary font-semibold text-center mb-1">
+          {loc.materialId}
+        </p>
+      )}
       <div className="text-center space-y-1">
         <p className="text-[10px] font-semibold text-foreground truncate">{loc.materialDesc || "—"}</p>
         {loc.category && <CategoryBadge category={loc.category} className="text-[9px]" />}

@@ -32,7 +32,7 @@ export const materialService = {
 export const locationService = {
   getAll:     (rackId)                  => api.get(rackId ? `/locations?rack=${rackId}` : '/locations'),
   create:     (data)                    => api.post('/locations', data),
-  assign:     (locationId, materialId)  => api.patch(`/locations/${locationId}/assign`, { materialId }),
+  assign:     (locationId, payload)     => api.patch(`/locations/${locationId}/assign`, typeof payload === 'string' ? { materialId: payload } : payload),
   unassign:   (locationId)              => api.patch(`/locations/${locationId}/assign`, { materialId: '' }),
   update:     (locationId, data)        => api.put(`/locations/${locationId}`, data),
   delete:     (locationId)              => api.delete(`/locations/${locationId}`),

@@ -30,11 +30,11 @@ router.get('/', requireAuth, async (req, res, next) => {
 
 /**
  * POST /api/movements
- * Body: { id, date, materialId, locationId, type, quantity, unit, reference, user, notes }
+ * Body: { id, date, materialId, locationId, type, quantity, unit, reference, user, notes, expiryDate, batch }
  */
 router.post('/', requireAuth, async (req, res, next) => {
   try {
-    const { id, date, materialId, locationId, type, quantity, unit, reference, user, notes } = req.body
+    const { id, date, materialId, locationId, type, quantity, unit, reference, user, notes, expiryDate, batch } = req.body
 
     // Validations
     if (!materialId || !locationId || !type || quantity === undefined) {
@@ -63,12 +63,23 @@ router.post('/', requireAuth, async (req, res, next) => {
       type,
       quantity: Number(quantity),
       unit: unit || 'PCS',
+      expiryDate: expiryDate || '',
+      batch: batch || '',
       reference: reference || '',
       user: user || req.user?.name || 'Warehouse Manager',
       notes: notes || '',
     })
 
     await movement.save()
+
+    // If IN movement has expiryDate or batch, update location's record for quick reference
+    if (type === 'IN' && (expiryDate || batch)) {
+      const locUpdate = {}
+      if (expiryDate) locUpdate.expiryDate = expiryDate
+      if (batch) locUpdate.batch = batch
+      await Location.updateOne({ locationId }, { $set: locUpdate })
+    }
+
     res.status(201).json(movement)
   } catch (err) { next(err) }
 })
@@ -290,7 +301,9 @@ router.post('/bulk', requireAuth, async (req, res, next) => {
       materialId: item.materialId,
       locationId: item.locationId,
       quantity: item.quantity,
-      unit: item.unit || 'PCS'
+      unit: item.unit || 'PCS',
+      expiryDate: item.expiryDate || '',
+      batch: item.batch || '',
     }))
 
     await Movement.insertMany(docs)

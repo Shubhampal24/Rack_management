@@ -1,7 +1,7 @@
 // src/lib/api/apiClient.js
 // Centralized API client — all backend calls go through here
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003/api'
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://rack.st9.in/api'
 
 function getToken() {
   return localStorage.getItem('hopshop_token')
