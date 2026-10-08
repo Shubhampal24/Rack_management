@@ -10,8 +10,13 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
   const [dropdownStyle, setDropdownStyle] = React.useState({})
 
   React.useEffect(() => {
-    setQuery(value || "")
-  }, [value])
+    const matched = options.find(o => (typeof o === 'string' ? o : o.value) === value)
+    if (matched) {
+      setQuery(typeof matched === 'string' ? matched : (matched.label || matched.value))
+    } else {
+      setQuery(value || "")
+    }
+  }, [value, options])
 
   React.useEffect(() => {
     const handleClickOutside = (e) => {
@@ -28,9 +33,10 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
   }, [])
 
   const filtered = options.filter(o => {
-    if (query === value) return true // Show all options if user hasn't started typing a new search
-    const text = typeof o === 'string' ? o : o.value
-    return text.toLowerCase().includes(query.toLowerCase())
+    const text = typeof o === 'string' ? o : (o.label || o.value || "")
+    const searchStr = typeof o === 'string' ? o : `${o.label} ${o.value} ${o.sub || ''}`
+    if (query === text) return true // Show all options if user hasn't started typing a new search
+    return searchStr.toLowerCase().includes(query.toLowerCase())
   })
   
   const handleChange = (e) => {
@@ -39,8 +45,10 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
     setOpen(true)
   }
 
-  const handleSelect = (val) => {
-    setQuery(val)
+  const handleSelect = (opt) => {
+    const val = typeof opt === 'string' ? opt : opt.value
+    const label = typeof opt === 'string' ? opt : (opt.label || opt.value)
+    setQuery(label)
     onChange(val)
     setOpen(false)
   }
@@ -100,15 +108,16 @@ export function Combobox({ value, onChange, options, placeholder = "Select or ty
           ) : (
             filtered.map((opt, i) => {
               const val = typeof opt === 'string' ? opt : opt.value
+              const label = typeof opt === 'object' && opt.label ? opt.label : val
               const sub = typeof opt === 'object' ? opt.sub : null
               return (
                 <li
                   key={i}
-                  onMouseDown={(e) => { e.preventDefault(); handleSelect(val) }}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelect(opt) }}
                   className={`relative flex flex-col w-full cursor-pointer select-none rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none hover:bg-accent hover:text-accent-foreground ${value === val ? "bg-accent text-accent-foreground" : ""}`}
                 >
                   <div className="flex items-center w-full">
-                    <span className="truncate font-medium">{val}</span>
+                    <span className="truncate font-medium">{label}</span>
                     {value === val && (
                       <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
                         <Check className="h-4 w-4 text-primary" />

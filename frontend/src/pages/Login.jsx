@@ -125,12 +125,7 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Hint */}
-          <div className="text-center text-xs text-muted-foreground mt-6 space-y-1">
-            <p>Test credentials (Password: <span className="font-mono text-foreground">WM@123</span>):</p>
-            <p>Admin: <span className="font-mono text-foreground">admin</span> | Godown: <span className="font-mono text-foreground">godown</span></p>
-            <p>Purchase: <span className="font-mono text-foreground">purchase</span> | Sales: <span className="font-mono text-foreground">sales</span></p>
-          </div>
+
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">

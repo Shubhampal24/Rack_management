@@ -3,6 +3,7 @@ import useWarehouseStore from "@/lib/store/useWarehouseStore"
 import { Card, CardContent } from "@/components/ui/card"
 import { StockBadge, CategoryBadge, LocationBadge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Combobox } from "@/components/ui/combobox"
 import { LEVEL_ORDER, LEVEL_LABELS } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 import { X, Package, Layers, ChevronRight, Activity, ArrowDownRight, ArrowUpRight, ShieldCheck } from "lucide-react"
@@ -88,9 +89,16 @@ export default function RackMap() {
   const getRackCellState = useWarehouseStore(s => s.getRackCellState)
   const inventory = useWarehouseStore(s => s.inventory ?? [])
   const movements = useWarehouseStore(s => s.enrichedMovements ?? [])
+  const materials = useWarehouseStore(s => s.materialMasterBase ?? [])
+  const assignMaterial = useWarehouseStore(s => s.assignMaterial)
 
   const [selectedCell, setSelectedCell] = React.useState(null)
   const [selectedBay, setSelectedBay] = React.useState("all")
+  
+  const [assignMatId, setAssignMatId] = React.useState("")
+  const [isAssigning, setIsAssigning] = React.useState(false)
+
+  React.useEffect(() => { setAssignMatId("") }, [selectedCell])
 
   // Handle ESC to close drawer
   React.useEffect(() => {
@@ -451,12 +459,45 @@ export default function RackMap() {
                   )}
                 </div>
               ) : (
-                <div className="text-center py-6 px-4 rounded-xl border border-dashed border-border/60 bg-secondary/10">
-                  <Package size={24} className="mx-auto text-muted-foreground/40 mb-2" />
-                  <p className="text-xs font-medium text-foreground">No Material Assigned</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    This location slot is currently free and available for stock storage.
-                  </p>
+                <div className="py-5 px-4 rounded-xl border border-dashed border-border/60 bg-secondary/10 text-center space-y-4">
+                  <div>
+                    <Package size={24} className="mx-auto text-muted-foreground/40 mb-2" />
+                    <p className="text-xs font-medium text-foreground">No Material Assigned</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      This location slot is free. Assign a material to begin storing stock here.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2 text-left bg-background p-3 rounded-lg border border-border/40 shadow-sm">
+                    <label className="text-[11px] font-semibold text-foreground">Assign Material</label>
+                    <Combobox
+                      options={materials.map(m => ({ value: m.id, label: m.name, sub: m.id }))}
+                      value={assignMatId}
+                      onChange={setAssignMatId}
+                      placeholder="Search and select material..."
+                      className="w-full"
+                    />
+                    <Button 
+                      className="w-full text-xs h-8 mt-2" 
+                      disabled={!assignMatId || isAssigning}
+                      onClick={async () => {
+                        try {
+                          setIsAssigning(true)
+                          await assignMaterial(selectedCell.locationId, assignMatId)
+                          // Re-fetch the updated cell from the store to refresh the drawer UI immediately
+                          const updatedLocations = useWarehouseStore.getState().locations
+                          const newLoc = updatedLocations.find(l => l.locationId === selectedCell.locationId)
+                          if (newLoc) setSelectedCell(newLoc)
+                        } catch(err) {
+                          console.error(err)
+                        } finally {
+                          setIsAssigning(false)
+                        }
+                      }}
+                    >
+                      {isAssigning ? "Assigning..." : "Assign to Location"}
+                    </Button>
+                  </div>
                 </div>
               )}
 
